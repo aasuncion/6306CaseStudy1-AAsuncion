@@ -1,0 +1,158 @@
+---
+title: "6306 Case 1 Analysis"
+author: "Albert Asuncion"
+date: "3/8/2017"
+output: html_document
+---
+
+Introduction:
+
+Horace Mann once said that "education ... beyond all other devices of human origin, is a great equalizer of the conditions of men". The Organization for Economic Co-operation and Development (OECD) holds as its mission the promotion of policies that will improve the economic and social well-being of people around the world. 
+
+In this study we want to find the correlation between GDP and the relative income levels of educators as an indicator of the importance education. Do weatlhier economies place a higher importance on education? Is the reverse true as well, where poorer countries are forced to perhaps put education as a lower priority, thus perpetuating the conditions of poorer states.
+
+This research was developed in R and available in Github.
+
+Load Required Packages
+```{r Libraries}
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(gridExtra)
+library(gtools)
+library(data.table)
+```
+
+Load and Review Data
+```{r LoadData}
+##Set working directory, load data into dataframes
+setwd("/Users/albertasuncion_mac/Documents/SMU/6306 - Intro to DS/rWD/")
+fedstats <- read.csv(file="getdata%2Fdata%2FEDSTATS_Country.csv",header=TRUE)
+##Skipping 2 empty rows from original file
+gdp <- read.csv(file="getdata%2Fdata%2FGDP.csv",header=TRUE,skip=3)
+## Remove NA columns
+gdp <- gdp[-c(3,6:10)]
+## Rename columns, 1st column in particular in order to prepare for dta merge
+names(gdp) <- c("CountryCode","Ranking","Country","GDP")
+```
+
+```{r Inspect_gdp, results='hide'}
+head(gdp)
+```
+
+```{r Inspect_fedstats, results='hide'}
+head(fedstats)
+```
+
+Merge data based on the country shortcode
+
+```{r MergeData, results='hide'}
+df_merged <- merge(fedstats, gdp, by="CountryCode")
+head(df_merged)
+```
+
+Answers to Questions:
+
+1. Number of matching IDs - After performing a merge on the CountryCode column, a total of 224 rows were created in the dataframe df_merged. This was arrived at by executing a dim() step as shown here.
+
+```{r RowCount_df_merged}
+dim(df_merged)
+```
+
+2. Sort on GDP, ascending order and find the 13th record - A new dataframe, df_merged.sorted, is created from df_merged. Transform the Ranking column to numeric using a new column Ranking2. Based on the Ranking2 column, create a subset for only those records with valid Rankings. To prepare for sorting GDP, the column needed to be converted to numeric and assigned to a new column called df_merged.sorted$GDP2. The conversion involved removing the "," from the values using gsub() and converting to a numeric class using as.numneric. The dataframe is then sorted using arrange() from the "dplyr" package.
+
+```{r SortByGDP, results='hide'}
+
+#Transform Ranking column to numeric
+df_merged$Ranking2 <- as.numeric(as.character(df_merged$Ranking))
+
+#Create a new dataframe for records with valid rankings
+df_merged.sorted <- subset(df_merged, df_merged$Ranking2>0)
+df_merged.sorted$GDP2 <- as.numeric(gsub(",","",df_merged.sorted$GDP))
+df_merged.sorted <- arrange(df_merged.sorted,GDP2)
+```
+
+The 13th ranked country in terms of GDP is KNA, St. Kitts and Nevis, found by referencing row index 13 of df_merged.sorted.
+
+```{r 13thRanked}
+df_merged.sorted[13,1:2]
+```
+
+3. Average GDP rankings of High income: OECD and High income nonOECD 
+
+{r RankingNumeric}
+#converting the df_merged.sorted$Ranking column to numeric and creating a new variable Ranking2 for the transformed column
+df_merged.sorted$Ranking2 <- as.numeric(as.character(df_merged.sorted$Ranking))
+
+Using the numeric column Ranking2, 2 1-column vectors are created using the subset function to create the "High income: OECD" and the "High income: nonOECD" groups. The means were taken of the df_merged.sorted$Ranking2 column to arrive at the respective means. The mean ranks are:
+
+High Income OECD: 32.97
+
+High Income nonOECD: 91.91
+
+```{r }
+#create vectors for "High income: OECD" and "High income: nonOECD" groups
+HighIncomeOECD <- subset(df_merged.sorted, df_merged.sorted$Income.Group == "High income: OECD")
+HighIncomeNonOECD <- subset(df_merged.sorted, df_merged.sorted$Income.Group == "High income: nonOECD")
+#calculate the means of the HighIncomeOECD and HighIncomeNonOECD vectors, disregarding NA
+Avg_HighIncomeOECD <- mean(HighIncomeOECD$Ranking2, na.rm=TRUE)
+Avg_HighIncomeNonOECD <- mean(HighIncomeNonOECD$Ranking2, na.rm=TRUE)
+Avg_HighIncomeOECD
+Avg_HighIncomeNonOECD
+```
+
+4. Plot of GDP by Income Group - 
+
+```{r Plot2}
+a <- ggplot(subset(df_merged.sorted, Income.Group=="High income: OECD"), aes(y=reorder(CountryCode,GDP2),x=GDP2)) + geom_point(aes(color=Income.Group)) + geom_point(colour="tomato") + theme(axis.text=element_text(size=6)) + scale_x_continuous(name="GDP", labels=dollar) + ylab("Country") + theme(legend.position = "none") + ggtitle("High Income: OECD") + theme(plot.title = element_text(size = 10, face="bold"))
+b <- ggplot(subset(df_merged.sorted, Income.Group=="High income: nonOECD"), aes(y=reorder(CountryCode,GDP2),x=GDP2)) + geom_point(aes(color=Income.Group)) + geom_point(colour="steelblue") + theme(axis.text=element_text(size=6)) + scale_x_continuous(name="GDP", labels=dollar) + ylab("Country") + theme(legend.position = "none") + ggtitle("High Income: nonOECD") + theme(plot.title = element_text(size = 10, face="bold"))
+c <- ggplot(subset(df_merged.sorted, Income.Group=="Upper middle income"), aes(y=reorder(CountryCode,GDP2),x=GDP2)) + geom_point(aes(color=Income.Group)) + geom_point(colour="seagreen") + theme(axis.text=element_text(size=6)) + scale_x_continuous(name="GDP", labels=dollar) + ylab("Country") + theme(legend.position = "none") + ggtitle("Upper Middle Income") + theme(plot.title = element_text(size = 10, face="bold"))
+d <- ggplot(subset(df_merged.sorted, Income.Group=="Lower middle income"), aes(y=reorder(CountryCode,GDP2),x=GDP2)) + geom_point(aes(color=Income.Group)) + geom_point(colour="slateblue") + theme(axis.text=element_text(size=6)) + scale_x_continuous(name="GDP", labels=dollar) + ylab("Country") + theme(legend.position = "none") + ggtitle("Lower Middle Income") + theme(plot.title = element_text(size = 10, face="bold"))
+e <- ggplot(subset(df_merged.sorted, Income.Group=="Low income"), aes(y=reorder(CountryCode,GDP2),x=GDP2)) + geom_point(aes(color=Income.Group)) + geom_point(colour="sienna") + theme(axis.text=element_text(size=6)) + scale_x_continuous(name="GDP", labels=dollar) + ylab("Country") + theme(legend.position = "none") + ggtitle("Low Income") + theme(plot.title = element_text(size = 10, face="bold"))
+grid.arrange(arrangeGrob(a, b, c, ncol=3, heights = 20))
+```
+
+```{r}
+grid.arrange(arrangeGrob(d, e , ncol=3, heights = 20))
+```
+
+5. Summary statistics of GDP by Income Group
+
+```{r SummaryStats}
+#Use the sorted data frame
+#Filter records where GDP is NA
+
+df_merged.sorted.nonNAGDP <- df_merged.sorted %>% filter(!is.na(GDP2))
+
+#Create a grouping by Income Group
+
+df_merged.sorted.nonNAGDP.grouped <- group_by(df_merged.sorted.nonNAGDP,Income.Group)
+
+#Summarize GDP by Income Group, and summarize basic statistics
+
+options(dplyr.width=Inf) #options forces all columns to appear in the output
+summarise(df_merged.sorted.nonNAGDP.grouped,countries=n(),totGDP=dollar(sum(GDP2,na.rm=TRUE)),minGDP=dollar(min(GDP2,na.rm=TRUE)),maxGDP=dollar(max(GDP2,na.rm=TRUE)),meanGDP=dollar(mean(GDP2, na.rm=TRUE)),stddevGDP=dollar(sd(GDP2,na.rm=TRUE)))
+```
+
+6. Table of income groups showing number of countries per quartile (5)
+
+```{r Quantile}
+#Add a column for the quartile and create a dafaframe with the quartile column
+
+df_merged.sorted.quartile <- setDT(df_merged.sorted)[, quartile := cut(df_merged.sorted$Ranking2, quantile(df_merged.sorted$Ranking2, probs=0:5/5), include.lowest=TRUE, labels=FALSE)]
+
+#Create a grouping by Income Group + Quartile
+
+df_merged.sorted.quartile.grouped <- group_by(df_merged.sorted.quartile,Income.Group,quartile)
+
+#Aggregate number of countries
+
+CountriesByIncomeQuartile <- aggregate(data=df_merged.sorted.quartile, df_merged.sorted.quartile$GDP2 ~ df_merged.sorted.quartile$Income.Group + df_merged.sorted.quartile$quartile, FUN=length)
+CountriesByIncomeQuartile
+```
+
+The total number of countries of Low Middle Income and in the first quantile group is 5.
+
+Conclusion:
+
+It is no surprise that among the countries with the largest economies also have the highest paid educators. However, educators are paid relatively well in some countries with the smallest economies (refer to the High Income: nonOECD chart).  
